@@ -42,7 +42,7 @@ def read_config():
     except IOError:
         pass
 
-    return MIRROR_BASE and API_KEY
+    return NICKNAME and MIRROR_BASE and API_KEY
 
 
 def write_config():
@@ -67,7 +67,8 @@ def write_config():
 
 
 def setup():
-    global API_KEY, MIRROR_BASE
+    global NICKNAME, API_KEY, MIRROR_BASE
+    NICKNAME = click.prompt('Enter your SmugMug name', default=NICKNAME)
     # TODO: Would be nice to have a sane, OS-specific default here
     base = click.prompt(
         'Where should your SmugMug galleries be mirrored?',
