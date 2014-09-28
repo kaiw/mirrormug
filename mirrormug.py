@@ -8,8 +8,9 @@ import click
 import requests
 import smugpy
 
-NICKNAME = None
 APP_NAME = 'MirrorMug'
+NICKNAME = None
+PASSWORD = None
 MIRROR_BASE = None
 API_KEY = None
 
@@ -20,7 +21,7 @@ smugmug = None
 
 
 def read_config():
-    global NICKNAME, API_KEY, MIRROR_BASE
+    global NICKNAME, PASSWORD, API_KEY, MIRROR_BASE
 
     def sane_get(parser, key):
         try:
@@ -37,11 +38,13 @@ def read_config():
             parser = ConfigParser.RawConfigParser()
             parser.readfp(f)
             NICKNAME = sane_get(parser, 'nickname')
+            PASSWORD = sane_get(parser, 'password')
             MIRROR_BASE = sane_get(parser, 'mirrorpath')
             API_KEY = sane_get(parser, 'apikey')
     except IOError:
         pass
 
+    # It's okay to be missing a password
     return NICKNAME and MIRROR_BASE and API_KEY
 
 
@@ -54,6 +57,7 @@ def write_config():
     section = 'main'
     parser.add_section(section)
     parser.set(section, 'nickname', NICKNAME)
+    parser.set(section, 'password', PASSWORD)
     parser.set(section, 'mirrorpath', MIRROR_BASE)
     parser.set(section, 'apikey', API_KEY)
 
@@ -67,8 +71,16 @@ def write_config():
 
 
 def setup():
-    global NICKNAME, API_KEY, MIRROR_BASE
+    global NICKNAME, PASSWORD, API_KEY, MIRROR_BASE
     NICKNAME = click.prompt('Enter your SmugMug name', default=NICKNAME)
+    if not PASSWORD:
+        click.secho(
+            'If you choose to enter your password here, it will be stored '
+            'in plain text in your config.\nDo not enter your password here '
+            'if this makes you nervous!', fg='red')
+        PASSWORD = click.prompt(
+            'Enter your SmugMug password (or leave blank to keep unchanged)',
+            default=PASSWORD, hide_input=True, show_default=False)
     # TODO: Would be nice to have a sane, OS-specific default here
     base = click.prompt(
         'Where should your SmugMug galleries be mirrored?',
@@ -180,7 +192,11 @@ def cli():
 
     smugmug = smugpy.SmugMug(
         api_key=API_KEY, api_version="1.2.2", app_name=APP_NAME)
-    smugmug.login_anonymously()
+    if PASSWORD:
+        smugmug.login_withPassword(
+            EmailAddress=NICKNAME, Password=PASSWORD)
+    else:
+        smugmug.login_anonymously()
 
 
 @cli.command()
