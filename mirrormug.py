@@ -92,6 +92,39 @@ def download_images(image_paths):
                 f.write(req.content)
 
 
+def mirror_album(album):
+    title = album['Title']
+    click.secho(
+        '\nChecking album "%s"' % title, bold=True)
+
+    mirror_path = get_mirror_path(album)
+    missing_images = get_missing_images(smugmug, album, mirror_path)
+    if not missing_images:
+        click.secho('Already synced', fg='green')
+        return
+    click.secho('Found %d missing images for album "%s"' % (
+                len(missing_images), title))
+
+    if not click.confirm('Download this album now?', default=True):
+        return
+
+    click.echo()
+    if not os.path.exists(mirror_path):
+        click.echo(
+            'Creating missing folder "%s"' % mirror_path)
+        os.makedirs(mirror_path)
+
+    download_images(missing_images)
+
+
+def mirror_albums(album_name=None):
+    albums = smugmug.albums_get(NickName=NICKNAME)
+    for album in albums["Albums"]:
+        if album_name and album['Title'] != album_name:
+            continue
+        mirror_album(album)
+
+
 @click.group()
 @click.pass_context
 def cli(ctx):
@@ -115,32 +148,14 @@ def setup():
 
 
 @cli.command()
-def syncall():
-    albums = smugmug.albums_get(NickName=NICKNAME)
+@click.argument('album_name')
+def getalbum(album_name):
+    mirror_albums(album_name)
 
-    for album in albums["Albums"]:
-        title = album['Title']
-        click.secho(
-            '\nChecking album "%s"' % title, bold=True)
 
-        mirror_path = get_mirror_path(album)
-        missing_images = get_missing_images(smugmug, album, mirror_path)
-        if not missing_images:
-            click.secho('Already synced', fg='green')
-            continue
-        click.secho('Found %d missing images for album "%s"' % (
-                    len(missing_images), title))
-
-        if not click.confirm('Download this album now?', default=True):
-            continue
-
-        click.echo()
-        if not os.path.exists(mirror_path):
-            click.echo(
-                'Creating missing folder "%s"' % mirror_path)
-            os.makedirs(mirror_path)
-
-        download_images(missing_images)
+@cli.command()
+def getalbums():
+    mirror_albums()
 
 
 if __name__ == '__main__':
