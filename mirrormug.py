@@ -44,6 +44,38 @@ def read_config():
     return MIRROR_BASE and API_KEY
 
 
+def write_config():
+    app_dir = click.get_app_dir(APP_NAME)
+    if not os.path.exists(app_dir):
+        os.makedirs(app_dir)
+
+    parser = ConfigParser.RawConfigParser()
+    section = 'main'
+    parser.add_section(section)
+    parser.set(section, 'mirrorpath', MIRROR_BASE)
+    parser.set(section, 'apikey', API_KEY)
+
+    config = os.path.join(click.get_app_dir(APP_NAME), 'config.ini')
+    try:
+        with open(config, 'w') as f:
+            parser.write(f)
+    except IOError as err:
+        click.secho(
+            'Couldn\'t write config file: %s' % err, fg='red')
+
+
+def setup():
+    global API_KEY, MIRROR_BASE
+    # TODO: Would be nice to have a sane, OS-specific default here
+    base = click.prompt(
+        'Where should your SmugMug galleries be mirrored?',
+        default=MIRROR_BASE or os.path.expanduser("~/Pictures"))
+    MIRROR_BASE = os.path.expanduser(base)
+    API_KEY = click.prompt('Enter your SmugMug API key', default=API_KEY)
+    if MIRROR_BASE and API_KEY:
+        write_config()
+
+
 def get_mirror_path(album):
     if not MIRROR_BASE:
         click.echo('Base folder missing from config')
@@ -133,8 +165,7 @@ def mirror_albums(album_name=None):
 
 
 @click.group()
-@click.pass_context
-def cli(ctx):
+def cli():
     global smugmug
 
     have_config = read_config()
@@ -142,16 +173,10 @@ def cli(ctx):
         if not click.confirm('Setup config now?', default=True):
             click.echo('Config missing; can\'t continue')
             raise click.Abort()
-        ctx.forward(setup)
+        setup()
 
     smugmug = smugpy.SmugMug(
         api_key=API_KEY, api_version="1.3.0", app_name="mugmirror")
-
-
-@cli.command()
-def setup():
-    click.echo('Setup not implemented')
-    raise click.Abort()
 
 
 @cli.command()
