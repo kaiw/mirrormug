@@ -13,6 +13,9 @@ APP_NAME = 'MirrorMug'
 MIRROR_BASE = None
 API_KEY = None
 
+VIDEO_KEYS = ('Video320URL', 'Video640URL', 'Video960URL', 'Video1280URL',
+              'Video1920URL', 'VideoSMILURL', 'VideoStreamingURL')
+
 smugmug = None
 
 
@@ -78,6 +81,10 @@ def get_missing_images(smugmug, album, mirror_path):
             click.secho(
                 'File "%s" is the wrong size; re-downloading' % image_path,
                 fg='red')
+
+        if any(k in image for k in VIDEO_KEYS):
+            click.echo('File "%s" is a video; skipping' % filename)
+            continue
 
         url = image['OriginalURL']
         missing_images.append((image_path, url))
