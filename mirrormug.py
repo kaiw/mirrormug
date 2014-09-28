@@ -13,6 +13,8 @@ APP_NAME = 'MirrorMug'
 MIRROR_BASE = None
 API_KEY = None
 
+smugmug = None
+
 
 def read_config():
     global API_KEY, MIRROR_BASE
@@ -93,12 +95,17 @@ def download_images(image_paths):
 @click.group()
 @click.pass_context
 def cli(ctx):
+    global smugmug
+
     have_config = read_config()
     if not have_config:
         if not click.confirm('Setup config now?', default=True):
             click.echo('Config missing; can\'t continue')
             raise click.Abort()
         ctx.forward(setup)
+
+    smugmug = smugpy.SmugMug(
+        api_key=API_KEY, api_version="1.3.0", app_name="mugmirror")
 
 
 @cli.command()
@@ -109,8 +116,6 @@ def setup():
 
 @cli.command()
 def syncall():
-    smugmug = smugpy.SmugMug(
-        api_key=API_KEY, api_version="1.3.0", app_name="mugmirror")
     albums = smugmug.albums_get(NickName=NICKNAME)
 
     for album in albums["Albums"]:
