@@ -139,9 +139,20 @@ def get_missing_images(smugmug, album, mirror_path):
 
 
 def download_images(image_paths):
+    headers = {"User-Agent": smugmug.application}
+    cookies = {}
+    session_id = getattr(smugmug, 'session_id', None)
+    # TODO: This apparently allows downloading of private images, but doesn't
+    # actually work in testing.
+    if session_id:
+        cookies["SMSESS"] = session_id
+    session = requests.Session()
+    session.headers = headers
+    session.cookies = requests.utils.cookiejar_from_dict(cookies)
+
     with click.progressbar(image_paths, label='Downloading images') as paths:
         for image_path, url in paths:
-            req = requests.get(url)
+            req = session.get(url)
             with open(image_path, 'wb') as f:
                 f.write(req.content)
 
