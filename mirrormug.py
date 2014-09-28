@@ -20,7 +20,7 @@ smugmug = None
 
 
 def read_config():
-    global API_KEY, MIRROR_BASE
+    global NICKNAME, API_KEY, MIRROR_BASE
 
     def sane_get(parser, key):
         try:
@@ -36,6 +36,7 @@ def read_config():
         with open(config) as f:
             parser = ConfigParser.RawConfigParser()
             parser.readfp(f)
+            NICKNAME = sane_get(parser, 'nickname')
             MIRROR_BASE = sane_get(parser, 'mirrorpath')
             API_KEY = sane_get(parser, 'apikey')
     except IOError:
@@ -52,6 +53,7 @@ def write_config():
     parser = ConfigParser.RawConfigParser()
     section = 'main'
     parser.add_section(section)
+    parser.set(section, 'nickname', NICKNAME)
     parser.set(section, 'mirrorpath', MIRROR_BASE)
     parser.set(section, 'apikey', API_KEY)
 
