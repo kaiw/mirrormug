@@ -91,13 +91,14 @@ def download_images(image_paths):
 
 
 @click.group()
-def cli():
+@click.pass_context
+def cli(ctx):
     have_config = read_config()
     if not have_config:
         if not click.confirm('Setup config now?', default=True):
             click.echo('Config missing; can\'t continue')
             raise click.Abort()
-        setup()
+        ctx.forward(setup)
 
 
 @cli.command()
