@@ -148,6 +148,13 @@ def setup():
 
 
 @cli.command()
+def listalbums():
+    albums = smugmug.albums_get(NickName=NICKNAME)
+    for album in albums["Albums"]:
+        click.echo(album['Title'])
+
+
+@cli.command()
 @click.argument('album_name')
 def getalbum(album_name):
     mirror_albums(album_name)
