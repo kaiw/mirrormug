@@ -178,7 +178,8 @@ def cli():
         setup()
 
     smugmug = smugpy.SmugMug(
-        api_key=API_KEY, api_version="1.3.0", app_name="mugmirror")
+        api_key=API_KEY, api_version="1.2.2", app_name=APP_NAME)
+    smugmug.login_anonymously()
 
 
 @cli.command()
