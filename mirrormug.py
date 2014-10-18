@@ -7,6 +7,7 @@ import ConfigParser
 
 import click
 import requests
+import simplejson
 import smugpy
 
 APP_NAME = 'MirrorMug'
@@ -14,6 +15,9 @@ NICKNAME = None
 PASSWORD = None
 MIRROR_BASE = None
 API_KEY = None
+
+CACHE_PATH = os.path.join(click.get_app_dir(APP_NAME), 'metadata.json')
+LOCAL_CACHE_PATH = os.path.join(click.get_app_dir(APP_NAME), 'localmd5.json')
 
 VIDEO_KEYS = ('Video320URL', 'Video640URL', 'Video960URL', 'Video1280URL',
               'Video1920URL', 'VideoSMILURL', 'VideoStreamingURL')
@@ -241,6 +245,144 @@ def getalbum(album_name):
 @cli.command()
 def getalbums():
     mirror_albums()
+
+
+@cli.command()
+def cachealbumsremote():
+    album_cache = smugmug.albums_get(NickName=NICKNAME)
+    image_cache = {}
+    metadata_cache = {
+        'albums': album_cache,
+        'images': image_cache,
+    }
+    with click.progressbar(
+            album_cache["Albums"], label='Caching albums') as albums:
+        for album in albums:
+            images = smugmug.images_get(
+                AlbumID=album['id'], AlbumKey=album['Key'], Heavy=True)
+            image_cache[album['id']] = images
+
+    with open(CACHE_PATH, 'w') as f:
+        simplejson.dump(metadata_cache, f, indent=2)
+
+
+@cli.command()
+def cachealbumslocal():
+    import hashlib
+    md5_cache = {}
+    for (base, dirs, files) in os.walk(MIRROR_BASE):
+        click.echo('Scanning %s...' % base)
+        for filename in files:
+            md5sum = hashlib.md5()
+            path = os.path.join(base, filename)
+            with open(path) as f:
+                md5sum.update(f.read())
+            md5_cache[path] = md5sum.hexdigest()
+
+    with open(LOCAL_CACHE_PATH, 'w') as f:
+        blob = {'md5': md5_cache}
+        simplejson.dump(blob, f, indent=2)
+
+
+@cli.command()
+def checkalbums():
+
+    def retrieve_cached_data():
+        with open(CACHE_PATH) as f:
+            return simplejson.load(f)
+
+    def retrieve_cached_md5sums():
+        with open(LOCAL_CACHE_PATH) as f:
+            return simplejson.load(f)
+
+    cached_data = retrieve_cached_data()
+    album_cache = cached_data['albums']['Albums']
+    image_cache = cached_data['images']
+
+    remote_md5s = {}
+
+    for album in album_cache:
+        mirror_path = get_mirror_path(album)
+
+        images = image_cache[str(album['id'])]
+        for image in images['Album']['Images']:
+            filename = image['FileName']
+            image_path = os.path.join(mirror_path, filename)
+
+            # Skip validating video files
+            if any(k in image for k in VIDEO_KEYS):
+                continue
+
+            try:
+                remote_md5s[image_path] = image['MD5Sum']
+            except KeyError:
+                click.secho(
+                    'Missing MD5 sum for %s' % image_path, fg='red')
+
+    local_md5s = retrieve_cached_md5sums()['md5']
+
+    # Purely MD5-based checks
+
+    missing_paths = {k for k in remote_md5s if k not in local_md5s}
+
+    seen_md5s = {}
+    duplicate_paths = []
+    for path, md5 in local_md5s.items():
+        if md5 in seen_md5s:
+            duplicate_paths.append((seen_md5s[md5], path))
+        else:
+            seen_md5s[md5] = path
+
+    # MD5 + path-based checks
+
+    remote_md5_paths = {v: k for k, v in remote_md5s.items()}
+    local_md5_paths = {v: k for k, v in local_md5s.items()}
+
+    incorrect_paths = []
+    extra_paths = []
+    incorrect_md5s = []
+
+    for md5, path in local_md5_paths.items():
+        remote_md5 = remote_md5s.get(path)
+        remote_path = remote_md5_paths.get(md5)
+        if remote_path:
+            if remote_path != path:
+                incorrect_paths.append((path, remote_path))
+        elif remote_md5:
+            if remote_md5 != md5:
+                incorrect_md5s.append(path)
+        else:
+            extra_paths.append(path)
+
+    if missing_paths:
+        click.secho("Images not mirrored locally:", bold=True)
+        for path in sorted(missing_paths):
+            click.echo(" * %s" % path)
+        click.echo()
+
+    if incorrect_paths:
+        click.secho("Images found in the wrong location:", bold=True)
+        for path, remote_path in sorted(incorrect_paths):
+            click.echo("Image at %s should be at %s" % (path, remote_path))
+        click.echo()
+
+    if incorrect_md5s:
+        click.secho("Images with bad checksums:", bold=True)
+        for path in sorted(incorrect_md5s):
+            click.echo(" * %s" % path)
+        click.echo()
+
+    if extra_paths:
+        click.secho("Images not synced to SmugMug:", bold=True)
+        for path in sorted(extra_paths):
+            click.echo(" * %s" % path)
+        click.echo()
+
+    if duplicate_paths:
+        click.secho("Duplicate images:", bold=True)
+        for path1, path2 in sorted(duplicate_paths):
+            click.echo(" * %s is also at %s" % (path1, path2))
+        click.echo()
 
 
 if __name__ == '__main__':
