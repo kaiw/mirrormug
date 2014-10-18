@@ -169,6 +169,11 @@ def download_images(image_paths, md5sums={}):
                         'image' % path, fg='red')
                     continue
 
+            if not req.content:
+                click.secho(
+                    'Downloaded image %s is empty; skipping ' % url, fg='red')
+                continue
+
             with open(image_path, 'wb') as f:
                 f.write(req.content)
 
