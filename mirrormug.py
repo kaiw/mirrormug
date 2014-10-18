@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
+import hashlib
 import os
 import ConfigParser
 
@@ -138,7 +139,7 @@ def get_missing_images(smugmug, album, mirror_path):
     return missing_images
 
 
-def download_images(image_paths):
+def download_images(image_paths, md5sums={}):
     headers = {"User-Agent": smugmug.application}
     cookies = {}
     session_id = getattr(smugmug, 'session_id', None)
@@ -152,7 +153,22 @@ def download_images(image_paths):
 
     with click.progressbar(image_paths, label='Downloading images') as paths:
         for image_path, url in paths:
+            if md5sums and path not in md5sums:
+                click.secho(
+                    'Checksum for %s missing; skipping image' % path, fg='red')
+                continue
+
             req = session.get(url)
+            if md5sums:
+                checked_md5sum = md5sums[path]
+                md5sum = hashlib.md5()
+                md5sum.update(req.content)
+                if md5sum.hexdigest() != checked_md5sum:
+                    click.secho(
+                        'Checksum for downloaded image %s incorrect; skipping '
+                        'image' % path, fg='red')
+                    continue
+
             with open(image_path, 'wb') as f:
                 f.write(req.content)
 
