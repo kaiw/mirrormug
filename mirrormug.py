@@ -124,7 +124,6 @@ def get_missing_images(smugmug, album, mirror_path):
         if os.path.exists(image_path):
             size = os.stat(image_path).st_size
             if size == image['Size']:
-                # TODO: Check MD5; requires authed access
                 continue
             click.secho(
                 'File "%s" is the wrong size; re-downloading' % image_path,
@@ -135,11 +134,12 @@ def get_missing_images(smugmug, album, mirror_path):
             continue
 
         url = image['OriginalURL']
-        missing_images.append((image_path, url))
+        md5sum = image.get('MD5Sum')
+        missing_images.append((image_path, url, md5sum))
     return missing_images
 
 
-def download_images(image_paths, md5sums={}):
+def download_images(image_paths):
     headers = {"User-Agent": smugmug.application}
     cookies = {}
     session_id = getattr(smugmug, 'session_id', None)
@@ -152,16 +152,9 @@ def download_images(image_paths, md5sums={}):
     session.cookies = requests.utils.cookiejar_from_dict(cookies)
 
     with click.progressbar(image_paths, label='Downloading images') as paths:
-        for image_path, url in paths:
-            if md5sums and image_path not in md5sums:
-                click.secho(
-                    'Checksum for %s missing; skipping image' % image_path,
-                    fg='red')
-                continue
-
+        for image_path, url, checked_md5sum in paths:
             req = session.get(url)
-            if md5sums:
-                checked_md5sum = md5sums[image_path]
+            if checked_md5sum:
                 md5sum = hashlib.md5()
                 md5sum.update(req.content)
                 if md5sum.hexdigest() != checked_md5sum:
