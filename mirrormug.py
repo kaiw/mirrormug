@@ -153,20 +153,21 @@ def download_images(image_paths, md5sums={}):
 
     with click.progressbar(image_paths, label='Downloading images') as paths:
         for image_path, url in paths:
-            if md5sums and path not in md5sums:
+            if md5sums and image_path not in md5sums:
                 click.secho(
-                    'Checksum for %s missing; skipping image' % path, fg='red')
+                    'Checksum for %s missing; skipping image' % image_path,
+                    fg='red')
                 continue
 
             req = session.get(url)
             if md5sums:
-                checked_md5sum = md5sums[path]
+                checked_md5sum = md5sums[image_path]
                 md5sum = hashlib.md5()
                 md5sum.update(req.content)
                 if md5sum.hexdigest() != checked_md5sum:
                     click.secho(
                         'Checksum for downloaded image %s incorrect; skipping '
-                        'image' % path, fg='red')
+                        'image' % image_path, fg='red')
                     continue
 
             if not req.content:
