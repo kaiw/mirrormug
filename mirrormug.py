@@ -269,15 +269,29 @@ def cachealbumsremote():
 @cli.command()
 def cachealbumslocal():
     import hashlib
+
+    try:
+        with open(LOCAL_CACHE_PATH) as f:
+            old_cache = simplejson.load(f)['md5']
+    except Exception:
+        old_cache = {}
+
     md5_cache = {}
     for (base, dirs, files) in os.walk(MIRROR_BASE):
         click.echo('Scanning %s...' % base)
         for filename in files:
-            md5sum = hashlib.md5()
             path = os.path.join(base, filename)
-            with open(path) as f:
-                md5sum.update(f.read())
-            md5_cache[path] = md5sum.hexdigest()
+            mtime = os.path.getmtime(path)
+
+            old_mtime, old_md5 = old_cache.get(path.decode('utf8'), (None, None))
+            if mtime == old_mtime:
+                md5 = old_md5
+            else:
+                md5sum = hashlib.md5()
+                with open(path) as f:
+                    md5sum.update(f.read())
+                md5 = md5sum.hexdigest()
+            md5_cache[path] = [mtime, md5]
 
     with open(LOCAL_CACHE_PATH, 'w') as f:
         blob = {'md5': md5_cache}
@@ -293,7 +307,8 @@ def checkalbums():
 
     def retrieve_cached_md5sums():
         with open(LOCAL_CACHE_PATH) as f:
-            return simplejson.load(f)
+            md5sums = simplejson.load(f)
+        return {k: md5 for k, (mtime, md5) in md5sums['md5'].items()}
 
     cached_data = retrieve_cached_data()
     album_cache = cached_data['albums']['Albums']
@@ -319,7 +334,7 @@ def checkalbums():
                 click.secho(
                     'Missing MD5 sum for %s' % image_path, fg='red')
 
-    local_md5s = retrieve_cached_md5sums()['md5']
+    local_md5s = retrieve_cached_md5sums()
 
     # Purely MD5-based checks
 
