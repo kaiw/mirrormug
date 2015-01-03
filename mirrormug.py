@@ -19,6 +19,7 @@ API_KEY = None
 CACHE_PATH = os.path.join(click.get_app_dir(APP_NAME), 'metadata.json')
 LOCAL_CACHE_PATH = os.path.join(click.get_app_dir(APP_NAME), 'localmd5.json')
 
+SKIP_VALIDATION = -1
 VIDEO_KEYS = ('Video320URL', 'Video640URL', 'Video960URL', 'Video1280URL',
               'Video1920URL', 'VideoSMILURL', 'VideoStreamingURL')
 
@@ -326,6 +327,7 @@ def checkalbums():
 
             # Skip validating video files
             if any(k in image for k in VIDEO_KEYS):
+                remote_md5s[image_path] = SKIP_VALIDATION
                 continue
 
             try:
@@ -364,7 +366,7 @@ def checkalbums():
             if remote_path != path:
                 incorrect_paths.append((path, remote_path))
         elif remote_md5:
-            if remote_md5 != md5:
+            if remote_md5 != md5 and remote_md5 != SKIP_VALIDATION:
                 incorrect_md5s.append(path)
         else:
             extra_paths.append(path)
