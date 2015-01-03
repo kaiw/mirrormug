@@ -299,17 +299,18 @@ def cachealbumslocal():
         simplejson.dump(blob, f, indent=2)
 
 
+def retrieve_cached_md5sums():
+    with open(LOCAL_CACHE_PATH) as f:
+        md5sums = simplejson.load(f)
+    return {k: md5 for k, (mtime, md5) in md5sums['md5'].items()}
+
+
 @cli.command()
 def checkalbums():
 
     def retrieve_cached_data():
         with open(CACHE_PATH) as f:
             return simplejson.load(f)
-
-    def retrieve_cached_md5sums():
-        with open(LOCAL_CACHE_PATH) as f:
-            md5sums = simplejson.load(f)
-        return {k: md5 for k, (mtime, md5) in md5sums['md5'].items()}
 
     cached_data = retrieve_cached_data()
     album_cache = cached_data['albums']['Albums']
@@ -341,14 +342,6 @@ def checkalbums():
     # Purely MD5-based checks
 
     missing_paths = {k for k in remote_md5s if k not in local_md5s}
-
-    seen_md5s = {}
-    duplicate_paths = []
-    for path, md5 in local_md5s.items():
-        if md5 in seen_md5s:
-            duplicate_paths.append((seen_md5s[md5], path))
-        else:
-            seen_md5s[md5] = path
 
     # MD5 + path-based checks
 
@@ -395,11 +388,26 @@ def checkalbums():
             click.echo(" * %s" % path)
         click.echo()
 
+
+@cli.command()
+def findduplicates():
+    local_md5s = retrieve_cached_md5sums()
+
+    seen_md5s = {}
+    duplicate_paths = []
+    for path, md5 in local_md5s.items():
+        if md5 in seen_md5s:
+            duplicate_paths.append((seen_md5s[md5], path))
+        else:
+            seen_md5s[md5] = path
+
     if duplicate_paths:
         click.secho("Duplicate images:", bold=True)
         for path1, path2 in sorted(duplicate_paths):
             click.echo(" * %s is also at %s" % (path1, path2))
-        click.echo()
+    else:
+        click.secho("No duplicates found", bold=True)
+    click.echo()
 
 
 if __name__ == '__main__':
