@@ -323,14 +323,15 @@ def get_local_md5sums():
     return {k: md5 for k, (mtime, md5) in md5_cache.items()}
 
 
+def get_remote_data():
+    with open(CACHE_PATH) as f:
+        return simplejson.load(f)
+
+
 @cli.command()
 def checkalbums():
 
-    def retrieve_cached_data():
-        with open(CACHE_PATH) as f:
-            return simplejson.load(f)
-
-    cached_data = retrieve_cached_data()
+    cached_data = get_remote_data()
     album_cache = cached_data['albums']['Albums']
     image_cache = cached_data['images']
 
