@@ -410,6 +410,9 @@ def checkalbums():
             click.echo(" * %s" % path)
         click.echo()
 
+    if any((missing_paths, incorrect_paths, incorrect_md5s, extra_paths)):
+        sys.exit(1)
+
 
 @cli.command()
 def findduplicates():
