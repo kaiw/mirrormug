@@ -211,17 +211,8 @@ def mirror_albums(album_name=None):
         mirror_album(album)
 
 
-@click.group()
-def cli():
+def setup_client():
     global smugmug
-
-    have_config = read_config()
-    if not have_config:
-        if not click.confirm('Setup config now?', default=True):
-            click.echo('Config missing; can\'t continue')
-            raise click.Abort()
-        setup()
-
     smugmug = smugpy.SmugMug(
         api_key=API_KEY, api_version="1.2.2", app_name=APP_NAME)
     if PASSWORD:
@@ -229,6 +220,18 @@ def cli():
             EmailAddress=NICKNAME, Password=PASSWORD)
     else:
         smugmug.login_anonymously()
+
+
+@click.group()
+def cli():
+    have_config = read_config()
+    if not have_config:
+        if not click.confirm('Setup config now?', default=True):
+            click.echo('Config missing; can\'t continue')
+            raise click.Abort()
+        setup()
+
+    setup_client()
 
 
 @cli.command()
