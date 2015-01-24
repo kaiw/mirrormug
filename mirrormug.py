@@ -3,6 +3,7 @@ from __future__ import print_function
 
 import hashlib
 import os
+import sys
 import ConfigParser
 
 import click
@@ -267,8 +268,7 @@ def cachealbumsremote():
         simplejson.dump(metadata_cache, f, indent=2)
 
 
-@cli.command()
-def cachealbumslocal():
+def get_local_md5sums():
     import hashlib
 
     try:
@@ -277,32 +277,50 @@ def cachealbumslocal():
     except Exception:
         old_cache = {}
 
-    md5_cache = {}
+    dir_count = 0
     for (base, dirs, files) in os.walk(MIRROR_BASE):
-        click.echo('Scanning %s...' % base)
-        for filename in files:
-            path = os.path.join(base, filename)
-            mtime = os.path.getmtime(path)
+        dir_count += len(dirs)
 
-            old_mtime, old_md5 = old_cache.get(path.decode('utf8'), (None, None))
-            if mtime == old_mtime:
-                md5 = old_md5
-            else:
-                md5sum = hashlib.md5()
-                with open(path) as f:
-                    md5sum.update(f.read())
-                md5 = md5sum.hexdigest()
-            md5_cache[path] = [mtime, md5]
+    filename_encoding = sys.getfilesystemencoding()
+    md5_cache = {}
+
+    def progress_item_display(progress_item):
+        if not progress_item:
+            return ''
+        base, dirs, files = progress_item
+        return os.path.basename(base)
+
+    with click.progressbar(
+            os.walk(MIRROR_BASE),
+            label='Scanning folders',
+            length=dir_count,
+            item_show_func=progress_item_display) as walk:
+        for walk_iter in walk:
+            base, dirs, files = walk_iter
+            for filename in files:
+                path = os.path.join(base, filename)
+                mtime = os.path.getmtime(path)
+
+                old_mtime, old_md5 = old_cache.get(
+                    path.decode(filename_encoding), (None, None))
+                if mtime == old_mtime:
+                    md5 = old_md5
+                else:
+                    md5sum = hashlib.md5()
+                    with open(path) as f:
+                        md5sum.update(f.read())
+                    md5 = md5sum.hexdigest()
+                # Even though file paths are bytestrings, because what we care
+                # about here is a faithful reproduction of the remote albums,
+                # storing these as unicode is really what we want.
+                unicode_path = path.decode(filename_encoding)
+                md5_cache[unicode_path] = [mtime, md5]
 
     with open(LOCAL_CACHE_PATH, 'w') as f:
         blob = {'md5': md5_cache}
         simplejson.dump(blob, f, indent=2)
 
-
-def retrieve_cached_md5sums():
-    with open(LOCAL_CACHE_PATH) as f:
-        md5sums = simplejson.load(f)
-    return {k: md5 for k, (mtime, md5) in md5sums['md5'].items()}
+    return {k: md5 for k, (mtime, md5) in md5_cache.items()}
 
 
 @cli.command()
@@ -337,7 +355,7 @@ def checkalbums():
                 click.secho(
                     'Missing MD5 sum for %s' % image_path, fg='red')
 
-    local_md5s = retrieve_cached_md5sums()
+    local_md5s = get_local_md5sums()
 
     # Purely MD5-based checks
 
@@ -391,7 +409,7 @@ def checkalbums():
 
 @cli.command()
 def findduplicates():
-    local_md5s = retrieve_cached_md5sums()
+    local_md5s = get_local_md5sums()
 
     seen_md5s = {}
     duplicate_paths = []
