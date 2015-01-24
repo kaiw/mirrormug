@@ -252,44 +252,6 @@ def getalbums():
     mirror_albums()
 
 
-@cli.command()
-def cachealbumsremote():
-
-    try:
-        with open(CACHE_PATH) as f:
-            old_cache = simplejson.load(f)
-    except Exception:
-        old_cache = {}
-
-    old_albums = {
-        album['id']: album for album in old_cache['albums']['Albums']}
-
-    album_cache = smugmug.albums_get(NickName=NICKNAME, Heavy=True)
-    image_cache = {}
-    metadata_cache = {
-        'albums': album_cache,
-        'images': image_cache,
-    }
-    with click.progressbar(
-            album_cache["Albums"], label='Caching albums') as albums:
-        for album in albums:
-            old_album = old_albums.get(album['id'], {})
-            old_updated = old_album.get('LastUpdated', '')
-            updated = album['LastUpdated']
-
-            if updated == old_updated:
-                images = old_cache['images'][str(album['id'])]
-            else:
-                images = smugmug.images_get(
-                    AlbumID=album['id'], AlbumKey=album['Key'], Heavy=True)
-            image_cache[album['id']] = images
-
-    with open(CACHE_PATH, 'w') as f:
-        simplejson.dump(metadata_cache, f, indent=2)
-
-    return metadata_cache
-
-
 def get_local_md5sums():
     import hashlib
 
@@ -346,8 +308,45 @@ def get_local_md5sums():
 
 
 def get_remote_data():
+    try:
+        with open(CACHE_PATH) as f:
+            old_cache = simplejson.load(f)
+    except Exception:
+        old_cache = {}
+
+    old_albums = {
+        album['id']: album for album in old_cache['albums']['Albums']}
+
+    click.echo("Fetching remote album list...")
+    album_cache = smugmug.albums_get(NickName=NICKNAME, Heavy=True)
+    image_cache = {}
+    metadata_cache = {
+        'albums': album_cache,
+        'images': image_cache,
+    }
+    with click.progressbar(
+            album_cache["Albums"], label='Caching albums') as albums:
+        for album in albums:
+            old_album = old_albums.get(album['id'], {})
+            old_updated = old_album.get('LastUpdated', '')
+            updated = album['LastUpdated']
+
+            if updated == old_updated:
+                images = old_cache['images'][str(album['id'])]
+            else:
+                images = smugmug.images_get(
+                    AlbumID=album['id'], AlbumKey=album['Key'], Heavy=True)
+            image_cache[album['id']] = images
+
+    with open(CACHE_PATH, 'w') as f:
+        simplejson.dump(metadata_cache, f, indent=2)
+
+    # This is obviously insane, but it's the easiest way to ensure normalised
+    # behaviour with respect to dict-keys-as-strings, etc.
     with open(CACHE_PATH) as f:
-        return simplejson.load(f)
+        metadata_cache = simplejson.load(f)
+
+    return metadata_cache
 
 
 @cli.command()
