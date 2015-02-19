@@ -356,6 +356,7 @@ def check_consistency():
     image_cache = cached_data['images']
 
     remote_md5s = {}
+    remote_image_album = {}
 
     for album in album_cache:
         mirror_path = get_mirror_path(album)
@@ -372,6 +373,7 @@ def check_consistency():
 
             try:
                 remote_md5s[image_path] = image['MD5Sum']
+                remote_image_album[image_path] = album
             except KeyError:
                 click.secho(
                     'Missing MD5 sum for %s' % image_path, fg='red')
@@ -403,13 +405,26 @@ def check_consistency():
         else:
             extra_paths.append(path)
 
-    return missing_paths, incorrect_paths, incorrect_md5s, extra_paths
+    need_update = list(missing_paths) + incorrect_paths + incorrect_md5s
+    # Ugly uniqification of dicts
+    seen_albums = set()
+    update_albums = []
+    for album in [remote_image_album[p] for p in need_update]:
+        album_id = str(album['id'])
+        if album_id not in seen_albums:
+            update_albums.append(album)
+            seen_albums.add(album_id)
+
+    return (
+        missing_paths, incorrect_paths, incorrect_md5s, extra_paths,
+        update_albums)
 
 
 @cli.command()
 def checkalbums():
 
-    missing_paths, incorrect_paths, incorrect_md5s, extra_paths = check_consistency()
+    (missing_paths, incorrect_paths, incorrect_md5s, extra_paths,
+        update_albums) = check_consistency()
 
     if missing_paths:
         click.secho("Images not mirrored locally:", bold=True)
@@ -433,6 +448,12 @@ def checkalbums():
         click.secho("Images not synced to SmugMug:", bold=True)
         for path in sorted(extra_paths):
             click.echo(" * %s" % path)
+        click.echo()
+
+    if update_albums:
+        click.secho("Albums needing an update:", bold=True)
+        for album in update_albums:
+            click.echo(" * %s" % album['Title'])
         click.echo()
 
     if any((missing_paths, incorrect_paths, incorrect_md5s, extra_paths)):
