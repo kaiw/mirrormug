@@ -178,7 +178,7 @@ def download_images(image_paths):
                 f.write(req.content)
 
 
-def mirror_album(album):
+def mirror_album(album, interactive=True):
     title = album['Title']
     click.secho(
         '\nChecking album "%s"' % title, bold=True)
@@ -191,7 +191,8 @@ def mirror_album(album):
     click.secho('Found %d missing images for album "%s"' % (
                 len(missing_images), title))
 
-    if not click.confirm('Download this album now?', default=True):
+    if interactive and not click.confirm(
+            'Download this album now?', default=True):
         return
 
     click.echo()
