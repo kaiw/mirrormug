@@ -349,9 +349,7 @@ def get_remote_data():
     return metadata_cache
 
 
-@cli.command()
-def checkalbums():
-
+def check_consistency():
     cached_data = get_remote_data()
     album_cache = cached_data['albums']['Albums']
     image_cache = cached_data['images']
@@ -403,6 +401,14 @@ def checkalbums():
                 incorrect_md5s.append(path)
         else:
             extra_paths.append(path)
+
+    return missing_paths, incorrect_paths, incorrect_md5s, extra_paths
+
+
+@cli.command()
+def checkalbums():
+
+    missing_paths, incorrect_paths, incorrect_md5s, extra_paths = check_consistency()
 
     if missing_paths:
         click.secho("Images not mirrored locally:", bold=True)
